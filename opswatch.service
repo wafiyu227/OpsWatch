@@ -1,0 +1,90 @@
+# ============================================================================
+# opswatch.service — systemd unit file for OpsWatch
+# ============================================================================
+#
+# WHAT IS SYSTEMD?
+# systemd is the "init system" on most modern Linux distributions.  It is
+# the FIRST process that starts when Linux boots, and it manages all other
+# services (programs that run in the background).
+#
+# When you run "sudo systemctl start nginx", systemd reads nginx's unit
+# file (like this one) to know HOW to start nginx — what command to run,
+# which user to run it as, what to do if it crashes, etc.
+#
+# WHAT IS A UNIT FILE?
+# A unit file is a configuration file (like a recipe card) that tells
+# systemd everything it needs to know about a service.  It has sections
+# in square brackets: [Unit], [Service], and [Install].
+#
+# WHERE DOES THIS FILE GO?
+#   sudo cp opswatch.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable opswatch.timer    (for scheduled checks)
+#   sudo systemctl start opswatch.timer
+#
+# ============================================================================
+
+[Unit]
+# --- Metadata about this service ---
+
+Description=OpsWatch Health Check Service
+# ^ A human-readable description. Shows up in "systemctl status opswatch".
+
+After=network-online.target
+# ^ Don't start OpsWatch until the network is ready.
+#   This matters because OpsWatch checks URLs — it needs internet access.
+#   "After" doesn't mean "requires", it means "if network is starting, wait
+#   for it to finish first".
+
+Wants=network-online.target
+# ^ Tells systemd we'd LIKE the network to be available, but don't fail
+#   if it isn't.  "Requires" would be stricter — it would refuse to start
+#   the service if the network was down.
+
+
+[Service]
+# --- How to run the service ---
+
+Type=oneshot
+# ^ "oneshot" means this service runs once and exits (like our health check
+#   script). Other types:
+#   - "simple"  → a long-running process (like a web server)
+#   - "forking" → the process forks into the background
+#   We use "oneshot" because our health check runs, logs results, and stops.
+
+ExecStart=/bin/bash /opt/opswatch/health_check.sh
+# ^ The actual command systemd runs.  This is the path to our script.
+#   /opt/opswatch/ is where we'll deploy the project on Linux.
+
+WorkingDirectory=/opt/opswatch
+# ^ Sets the "current directory" before running the command.
+#   Same as doing "cd /opt/opswatch" first.
+
+User=opswatch
+# ^ Run the service as the "opswatch" user, NOT as root.
+#   This is a security best practice called "least privilege" — the
+#   application only gets the permissions it absolutely needs.
+
+Group=opswatch
+# ^ The Linux group for the service.  Groups let you manage permissions
+#   for multiple users at once.
+
+StandardOutput=journal
+StandardError=journal
+# ^ Send all output (print statements, errors) to the systemd journal.
+#   You can read it with: journalctl -u opswatch
+#   This is better than printing to the terminal because:
+#   1. The output is saved even after reboot
+#   2. It has timestamps
+#   3. You can filter and search it
+
+
+[Install]
+# --- When should this service be available? ---
+
+WantedBy=multi-user.target
+# ^ This determines WHEN the service is allowed to start.
+#   "multi-user.target" means "after the system has booted to the point
+#   where multiple users can log in" — basically, normal operation.
+#   You almost always want this for application services.
+

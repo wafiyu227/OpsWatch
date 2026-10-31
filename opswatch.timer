@@ -1,0 +1,55 @@
+# ============================================================================
+# opswatch.timer — systemd timer to run health checks on a schedule
+# ============================================================================
+#
+# WHAT IS A TIMER?
+# A systemd timer is like a "cron job" but managed by systemd.  It triggers
+# a service (opswatch.service) at scheduled intervals.
+#
+# Think of it this way:
+#   - opswatch.service = WHAT to run (the health check script)
+#   - opswatch.timer   = WHEN to run it (every 5 minutes)
+#
+# WHY USE A TIMER INSTEAD OF CRON?
+# Both work! But systemd timers integrate with journalctl (centralized logs),
+# can handle missed runs, and are easier to manage with systemctl.
+# You'll learn cron too — it's simpler for quick one-liners.
+#
+# COMMANDS:
+#   sudo systemctl enable opswatch.timer    (auto-start on boot)
+#   sudo systemctl start opswatch.timer     (start now)
+#   sudo systemctl status opswatch.timer    (check status)
+#   sudo systemctl stop opswatch.timer      (stop scheduling)
+#   systemctl list-timers                   (see all active timers)
+#
+# ============================================================================
+
+[Unit]
+Description=Run OpsWatch health checks every 5 minutes
+
+[Timer]
+OnBootSec=1min
+# ^ Run the FIRST health check 1 minute after the system boots.
+#   This gives the network time to come up before we start checking URLs.
+
+OnUnitActiveSec=5min
+# ^ After that, run again every 5 minutes.
+#   You can change this to 1min, 10min, 30min, 1h, etc.
+#   For testing, try 1min so you see results quickly.
+
+AccuracySec=30s
+# ^ How precise the timing needs to be.  systemd may delay the trigger by
+#   up to this amount to batch it with other timers (saves CPU).
+#   30 seconds is fine for monitoring. For something time-critical you'd
+#   use a smaller value.
+
+Persistent=true
+# ^ If the system was off when a check was supposed to run, run it
+#   immediately when the system comes back on.  Without this, missed
+#   checks are simply skipped.
+
+[Install]
+WantedBy=timers.target
+# ^ "timers.target" is a systemd target that groups all timers.
+#   This makes our timer start when systemd loads its timers.
+
